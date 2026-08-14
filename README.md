@@ -155,7 +155,7 @@ Foundation-signed with the permanent identifier
 `org.openclaw.clawdex`, hardened runtime, secure timestamp, and Apple
 notarization. A protected-default-branch workflow verifies the exact uploaded
 inventory, trusted signed tag object and commit, reproducible non-Darwin payloads, checksums,
-provenance, Darwin build metadata bound to that commit and Go 1.26.5,
+provenance, Darwin build metadata bound to that commit and Go 1.26.6,
 signatures, exact embedded designated requirements, and online notarization
 constraints before publication. After separate VM and approval gates, the
 protected workflow publishes and re-downloads the exact sealed asset snapshot.

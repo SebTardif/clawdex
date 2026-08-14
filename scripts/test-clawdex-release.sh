@@ -62,7 +62,7 @@ grep -F "      release-id: \${{ steps.download.outputs.release-id }}" \
 grep -F "          EXPECTED_RELEASE_ID: \${{ needs.verify-inventory.outputs.release-id }}" \
   "$ROOT/.github/workflows/release-assets.yml" >/dev/null || \
   fail "publisher does not receive the verified draft ID"
-[[ "$(grep -Fc '          go-version: 1.26.5' "$ROOT/.github/workflows/release-assets.yml")" == 2 ]] || \
+[[ "$(grep -Fc '          go-version: 1.26.6' "$ROOT/.github/workflows/release-assets.yml")" == 2 ]] || \
   fail "native verification jobs do not use the exact Go metadata reader"
 [[ "$(grep -Fc 'download-clawdex-release-assets.sh' "$ROOT/.github/workflows/release-assets.yml")" == 1 ]] || \
   fail "workflow must download the mutable release exactly once"
@@ -188,7 +188,7 @@ case "${1:-}" in
     destination=${!#}
     mock_root=$(cd "$(dirname "$0")/.." && pwd)
     mkdir -p "$destination"
-    printf 'module github.com/openclaw/clawdex\n\ngo 1.26.5\n' > "$destination/go.mod"
+    printf 'module github.com/openclaw/clawdex\n\ngo 1.26.6\n' > "$destination/go.mod"
     cp "$mock_root/release-changelog.md" "$destination/CHANGELOG.md"
     ;;
   rev-parse)
@@ -251,7 +251,7 @@ EOF
 cat > "$FAKE_BIN/go" <<'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-}" == env && "${2:-}" == GOVERSION ]]; then
-  echo go1.26.5
+  echo go1.26.6
   exit 0
 fi
 if [[ "${1:-}" == version && "${2:-}" == -m && "${3:-}" == -json ]]; then
@@ -260,7 +260,7 @@ if [[ "${1:-}" == version && "${2:-}" == -m && "${3:-}" == -json ]]; then
     *) goarch=arm64 ;;
   esac
   jq -n \
-    --arg go_version "${MOCK_BUILD_GO_VERSION:-go1.26.5}" \
+    --arg go_version "${MOCK_BUILD_GO_VERSION:-go1.26.6}" \
     --arg path "${MOCK_BUILD_PATH:-github.com/openclaw/clawdex/cmd/clawdex}" \
     --arg module "${MOCK_BUILD_MODULE:-github.com/openclaw/clawdex}" \
     --arg commit "${MOCK_BUILD_COMMIT:-0123456789abcdef0123456789abcdef01234567}" \
@@ -541,12 +541,12 @@ for name in "${expected_names[@]}"; do
   [[ -f "$RELEASE_DIR/$name" ]] || fail "missing release asset: $name"
 done
 [[ "$(find "$RELEASE_DIR" -type f | wc -l | tr -d ' ')" == "${#expected_names[@]}" ]] || fail "unexpected release inventory"
-jq -e '.schema_version == 3 and .tag == "v0.1.1" and .tag_object == "0123456789abcdef0123456789abcdef01234567" and .go_version == "go1.26.5" and .driver_commit == "0123456789abcdef0123456789abcdef01234567" and (.release_notes | length > 0) and (.artifacts | length == 6) and (.darwin | length == 2)' \
+jq -e '.schema_version == 3 and .tag == "v0.1.1" and .tag_object == "0123456789abcdef0123456789abcdef01234567" and .go_version == "go1.26.6" and .driver_commit == "0123456789abcdef0123456789abcdef01234567" and (.release_notes | length > 0) and (.artifacts | length == 6) and (.darwin | length == 2)' \
   "$RELEASE_DIR/provenance.json" >/dev/null
 
 TRUSTED_SOURCE="$WORK_DIR/trusted-source"
 mkdir -p "$TRUSTED_SOURCE"
-printf 'module github.com/openclaw/clawdex\n\ngo 1.26.5\n' > "$TRUSTED_SOURCE/go.mod"
+printf 'module github.com/openclaw/clawdex\n\ngo 1.26.6\n' > "$TRUSTED_SOURCE/go.mod"
 cp "$WORK_DIR/release-changelog.md" "$TRUSTED_SOURCE/CHANGELOG.md"
 
 if MOCK_GIT_VERIFY_TAG=fail EXPECTED_COMMIT=0123456789abcdef0123456789abcdef01234567 \

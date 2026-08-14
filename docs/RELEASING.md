@@ -194,7 +194,7 @@ Darwin binaries must have hardened runtime, secure timestamp, identifier
 `org.openclaw.clawdex`, Foundation authority/team, the expected thin
 architecture, exact embedded designated requirement, accepted notary
 submission, embedded clean VCS revision matching the signed tag commit, exact
-Go 1.26.5 build metadata, correct runtime version, and an online
+Go 1.26.6 build metadata, correct runtime version, and an online
 `codesign --verify --strict --check-notarization -R=notarized` result. A
 standalone command-line binary has no stapling container.
 
@@ -249,7 +249,7 @@ leaving a misleading all-skipped green run. The workflow:
    embedded name to equal the requested ref, verifies its signature against
    that protected trust anchor, and binds provenance to both the annotated tag
    object and resulting commit.
-4. Uses exact Go 1.26.5 to rebuild all four Linux and Windows binaries from the
+4. Uses exact Go 1.26.6 to rebuild all four Linux and Windows binaries from the
    trusted tag and byte-compares them with the uploaded payloads.
 5. Seals that exact eight-file snapshot as a workflow artifact;
    both Darwin jobs consume its artifact ID instead of re-downloading mutable
@@ -260,7 +260,7 @@ leaving a misleading all-skipped green run. The workflow:
    provenance, Foundation signature, identifier, exact embedded designated
    requirement, hardened runtime, secure timestamp, exactly one architecture,
    clean embedded VCS revision matching the authenticated commit, exact Go
-   1.26.5 build metadata, online notarization constraint, and `--version` on
+   1.26.6 build metadata, online notarization constraint, and `--version` on
    native Intel and Apple Silicon runners.
 8. After protected-environment approval, authenticates the exact repository,
    tag object, commit, verifier commit, release ID, workflow run, and sealed

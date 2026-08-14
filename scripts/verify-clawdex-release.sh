@@ -111,7 +111,7 @@ jq -se \
      (.tag_object | test("^[0-9a-f]{40}$")) and
      (.commit | test("^[0-9a-f]{40}$")) and
      (.driver_commit | test("^[0-9a-f]{40}$")) and
-     .go_version == "go1.26.5" and
+     .go_version == "go1.26.6" and
      (.source_date_epoch | type == "number" and floor == . and . > 0) and
      (.release_notes | type == "array" and length > 0) and
      all(.release_notes[];
@@ -299,8 +299,8 @@ if [[ "$MODE" == --non-darwin ]]; then
   }
   required_go="go$(awk '/^go / { print $2; exit }' "$SOURCE_DIR/go.mod")"
   actual_go=$(GOTOOLCHAIN=local GOENV=off go env GOVERSION)
-  [[ "$required_go" == go1.26.5 && "$actual_go" == "$required_go" ]] || {
-    echo "non-Darwin reproduction requires go1.26.5, found $actual_go for $required_go source" >&2
+  [[ "$required_go" == go1.26.6 && "$actual_go" == "$required_go" ]] || {
+    echo "non-Darwin reproduction requires go1.26.6, found $actual_go for $required_go source" >&2
     exit 1
   }
 
@@ -374,7 +374,7 @@ jq -e \
   --arg commit "$EXPECTED_COMMIT" \
   --arg goarch "$goarch" \
   'def setting($key): [.Settings[] | select(.Key == $key) | .Value];
-   .GoVersion == "go1.26.5" and
+   .GoVersion == "go1.26.6" and
    .Path == "github.com/openclaw/clawdex/cmd/clawdex" and
    .Main.Path == "github.com/openclaw/clawdex" and
    setting("vcs") == ["git"] and

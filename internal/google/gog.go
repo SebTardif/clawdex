@@ -20,6 +20,7 @@ const (
 	maxAvatarConcurrency     = 8
 	maxAvatarBytes           = 10 << 20
 	avatarLookupTimeout      = 20 * time.Second
+	maxContactsListPages     = 50
 )
 
 type Options struct {
@@ -45,7 +46,10 @@ func (g GogAdapter) ListContactsWithOptions(ctx context.Context, account string,
 	}
 	var out []model.SourceContact
 	page := ""
-	for {
+	for pages := 0; pages < maxContactsListPages; pages++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		args := []string{"--no-input", "contacts", "list", "--json", "--max", "1000"}
 		if page != "" {
 			args = append(args, "--page", page)
@@ -74,8 +78,12 @@ func (g GogAdapter) ListContactsWithOptions(ctx context.Context, account string,
 			}
 			return out, nil
 		}
+		if nextPage == page {
+			return nil, fmt.Errorf("gog contacts list: repeated nextPageToken %q", nextPage)
+		}
 		page = nextPage
 	}
+	return nil, fmt.Errorf("gog contacts list: exceeded %d pages", maxContactsListPages)
 }
 
 func (o Options) avatarConcurrency() int {

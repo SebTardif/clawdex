@@ -20,7 +20,11 @@ const (
 	maxAvatarConcurrency     = 8
 	maxAvatarBytes           = 10 << 20
 	avatarLookupTimeout      = 20 * time.Second
-	maxContactsListPages     = 50
+	// Safety ceiling for a nextPageToken that keeps changing. Google does
+	// not publish a contacts page maximum; 500 pages at --max 1000 is
+	// 500_000 contacts, well above a normal account, and still stops a
+	// unique-token hang. A listing that ends before this bound succeeds.
+	maxContactsListPages = 500
 )
 
 type Options struct {

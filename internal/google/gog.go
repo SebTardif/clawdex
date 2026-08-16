@@ -50,7 +50,7 @@ func (g GogAdapter) ListContactsWithOptions(ctx context.Context, account string,
 	}
 	var out []model.SourceContact
 	page := ""
-	seenPages := make(map[string]struct{})
+	seenPageTokens := make(map[string]struct{})
 	for pages := 0; pages < maxContactsListPages; pages++ {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -83,12 +83,10 @@ func (g GogAdapter) ListContactsWithOptions(ctx context.Context, account string,
 			}
 			return out, nil
 		}
-		if _, seen := seenPages[nextPage]; seen || nextPage == page {
+		if _, seen := seenPageTokens[nextPage]; seen {
 			return nil, fmt.Errorf("gog contacts list: repeated nextPageToken %q", nextPage)
 		}
-		if page != "" {
-			seenPages[page] = struct{}{}
-		}
+		seenPageTokens[nextPage] = struct{}{}
 		page = nextPage
 	}
 	return nil, fmt.Errorf("gog contacts list: exceeded %d pages", maxContactsListPages)

@@ -20,6 +20,11 @@ const (
 	maxAvatarConcurrency     = 8
 	maxAvatarBytes           = 10 << 20
 	avatarLookupTimeout      = 20 * time.Second
+	// Safety ceiling for a nextPageToken that keeps changing. Google does
+	// not publish a contacts page maximum; 500 pages at --max 1000 is
+	// 500_000 contacts, well above a normal account, and still stops a
+	// unique-token hang. A listing that ends before this bound succeeds.
+	maxContactsListPages = 500
 )
 
 type Options struct {
@@ -45,7 +50,11 @@ func (g GogAdapter) ListContactsWithOptions(ctx context.Context, account string,
 	}
 	var out []model.SourceContact
 	page := ""
-	for {
+	seenPageTokens := make(map[string]struct{})
+	for pages := 0; pages < maxContactsListPages; pages++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		args := []string{"--no-input", "contacts", "list", "--json", "--max", "1000"}
 		if page != "" {
 			args = append(args, "--page", page)
@@ -74,8 +83,13 @@ func (g GogAdapter) ListContactsWithOptions(ctx context.Context, account string,
 			}
 			return out, nil
 		}
+		if _, seen := seenPageTokens[nextPage]; seen {
+			return nil, fmt.Errorf("gog contacts list: repeated nextPageToken %q", nextPage)
+		}
+		seenPageTokens[nextPage] = struct{}{}
 		page = nextPage
 	}
+	return nil, fmt.Errorf("gog contacts list: exceeded %d pages", maxContactsListPages)
 }
 
 func (o Options) avatarConcurrency() int {

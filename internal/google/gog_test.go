@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openclaw/clawdex/internal/model"
 )
@@ -59,6 +60,106 @@ func TestGogAdapterListContactsUsesNoInput(t *testing.T) {
 	}
 	if !strings.Contains(string(args), "--page") {
 		t.Fatalf("missing page args = %s", args)
+	}
+}
+
+func TestGogAdapterListContactsRejectsRepeatedPageToken(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "gog")
+	if runtime.GOOS == "windows" {
+		bin += ".bat"
+	}
+	count := filepath.Join(dir, "count")
+	script := "#!/bin/sh\necho x >> \"" + count + "\"\nprintf '%s\\n' '{\"contacts\":[{\"resourceName\":\"people/c1\",\"name\":\"Ada\"}],\"nextPageToken\":\"same\"}'\n"
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := (GogAdapter{Binary: bin}).ListContacts(ctx, "ada@example.com")
+	if err == nil || !strings.Contains(err.Error(), `repeated nextPageToken "same"`) {
+		t.Fatalf("err = %v", err)
+	}
+	got, readErr := os.ReadFile(count)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if n := strings.Count(string(got), "x"); n != 2 {
+		t.Fatalf("invocations = %d want 2", n)
+	}
+}
+
+func TestGogAdapterListContactsRejectsAlternatingPageTokens(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "gog")
+	if runtime.GOOS == "windows" {
+		bin += ".bat"
+	}
+	count := filepath.Join(dir, "count")
+	script := "#!/bin/sh\necho x >> \"" + count + "\"\nn=$(wc -l < \"" + count + "\")\nif [ $((n % 2)) -eq 1 ]; then tok=A; else tok=B; fi\nprintf '%s\\n' \"{\\\"contacts\\\":[{\\\"resourceName\\\":\\\"people/c$n\\\",\\\"name\\\":\\\"Ada$n\\\"}],\\\"nextPageToken\\\":\\\"$tok\\\"}\"\n"
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := (GogAdapter{Binary: bin}).ListContacts(ctx, "ada@example.com")
+	if err == nil || !strings.Contains(err.Error(), `repeated nextPageToken "A"`) {
+		t.Fatalf("err = %v", err)
+	}
+	got, readErr := os.ReadFile(count)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if n := strings.Count(string(got), "x"); n != 3 {
+		t.Fatalf("invocations = %d want 3", n)
+	}
+}
+
+func TestGogAdapterListContactsCapsIncrementingPageTokens(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "gog")
+	if runtime.GOOS == "windows" {
+		bin += ".bat"
+	}
+	count := filepath.Join(dir, "count")
+	script := "#!/bin/sh\nif [ -f \"" + count + "\" ]; then n=$(cat \"" + count + "\"); else n=0; fi\nn=$((n+1))\nprintf '%s\\n' \"$n\" > \"" + count + "\"\nprintf '%s\\n' \"{\\\"contacts\\\":[{\\\"resourceName\\\":\\\"people/c$n\\\",\\\"name\\\":\\\"Ada$n\\\"}],\\\"nextPageToken\\\":\\\"page-$n\\\"}\"\n"
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	_, err := (GogAdapter{Binary: bin}).ListContacts(ctx, "ada@example.com")
+	if err == nil || !strings.Contains(err.Error(), "exceeded 500 pages") {
+		t.Fatalf("err = %v", err)
+	}
+	got, readErr := os.ReadFile(count)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if n := strings.TrimSpace(string(got)); n != "500" {
+		t.Fatalf("invocations = %q want 500", n)
+	}
+}
+
+func TestGogAdapterListContactsCompletesAfterFiftyPages(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "gog")
+	if runtime.GOOS == "windows" {
+		bin += ".bat"
+	}
+	count := filepath.Join(dir, "count")
+	script := "#!/bin/sh\nif [ -f \"" + count + "\" ]; then n=$(cat \"" + count + "\"); else n=0; fi\nn=$((n+1))\nprintf '%s\\n' \"$n\" > \"" + count + "\"\nif [ \"$n\" -ge 51 ]; then printf '%s\\n' \"{\\\"contacts\\\":[{\\\"resourceName\\\":\\\"people/c$n\\\",\\\"name\\\":\\\"Ada$n\\\"}]}\"; else printf '%s\\n' \"{\\\"contacts\\\":[{\\\"resourceName\\\":\\\"people/c$n\\\",\\\"name\\\":\\\"Ada$n\\\"}],\\\"nextPageToken\\\":\\\"page-$n\\\"}\"; fi\n"
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	contacts, err := (GogAdapter{Binary: bin}).ListContacts(ctx, "ada@example.com")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if len(contacts) != 51 {
+		t.Fatalf("contacts = %d want 51", len(contacts))
 	}
 }
 

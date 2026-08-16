@@ -89,6 +89,32 @@ func TestGogAdapterListContactsRejectsRepeatedPageToken(t *testing.T) {
 	}
 }
 
+func TestGogAdapterListContactsRejectsAlternatingPageTokens(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "gog")
+	if runtime.GOOS == "windows" {
+		bin += ".bat"
+	}
+	count := filepath.Join(dir, "count")
+	script := "#!/bin/sh\necho x >> \"" + count + "\"\nn=$(wc -l < \"" + count + "\")\nif [ $((n % 2)) -eq 1 ]; then tok=A; else tok=B; fi\nprintf '%s\\n' \"{\\\"contacts\\\":[{\\\"resourceName\\\":\\\"people/c$n\\\",\\\"name\\\":\\\"Ada$n\\\"}],\\\"nextPageToken\\\":\\\"$tok\\\"}\"\n"
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	_, err := (GogAdapter{Binary: bin}).ListContacts(ctx, "ada@example.com")
+	if err == nil || !strings.Contains(err.Error(), `repeated nextPageToken "A"`) {
+		t.Fatalf("err = %v", err)
+	}
+	got, readErr := os.ReadFile(count)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if n := strings.Count(string(got), "x"); n != 3 {
+		t.Fatalf("invocations = %d want 3", n)
+	}
+}
+
 func TestGogAdapterListContactsCapsIncrementingPageTokens(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "gog")

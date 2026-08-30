@@ -1,6 +1,7 @@
 package index
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -224,6 +225,96 @@ func TestNotesMissingDirAndDuplicateNames(t *testing.T) {
 	}
 	if len(notes) != 2 || notes[0].Body == notes[1].Body {
 		t.Fatalf("notes = %#v", notes)
+	}
+}
+
+func TestAddNoteErrorsWhenNotesIsRegularFile(t *testing.T) {
+	r := testRepo(t)
+	s := New(r)
+	p, err := s.AddPerson("Ada Notes File", []string{"ada-notes-file@example.com"}, nil, nil, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	notesPath := filepath.Join(filepath.Dir(p.Path), "notes")
+	if err := os.WriteFile(notesPath, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	n := markdown.NewNote(p.ID, "note", "manual", "hi", time.Time{}, time.Now(), nil)
+	done := make(chan error, 1)
+	go func() {
+		_, addErr := s.AddNote("ada-notes-file@example.com", n)
+		done <- addErr
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error when notes is a regular file")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("AddNote hung when notes is a regular file")
+	}
+}
+
+func TestAddNoteUniqueSuffixUsesOriginalBase(t *testing.T) {
+	r := testRepo(t)
+	s := New(r)
+	if _, err := s.AddPerson("Ada Suffix", nil, nil, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 5, 8, 9, 0, 0, 0, time.UTC)
+	n := markdown.NewNote("", "note", "manual", "first", now, now, nil)
+	first, err := s.AddNote("Ada Suffix", n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.Body = "second"
+	second, err := s.AddNote("Ada Suffix", n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.Body = "third"
+	third, err := s.AddNote("Ada Suffix", n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(first.Path) != "2026-05-08T09-00-00Z-note.md" {
+		t.Fatalf("first path = %s", first.Path)
+	}
+	if filepath.Base(second.Path) != "2026-05-08T09-00-00Z-note-2.md" {
+		t.Fatalf("second path = %s", second.Path)
+	}
+	if filepath.Base(third.Path) != "2026-05-08T09-00-00Z-note-3.md" {
+		t.Fatalf("third path = %s", third.Path)
+	}
+}
+
+func TestAddNoteUniqueSuffixCap(t *testing.T) {
+	r := testRepo(t)
+	s := New(r)
+	p, err := s.AddPerson("Ada Cap", nil, nil, nil, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 5, 8, 9, 0, 0, 0, time.UTC)
+	n := markdown.NewNote(p.ID, "note", "manual", "cap", now, now, nil)
+	notesDir := filepath.Join(filepath.Dir(p.Path), "notes")
+	if err := os.MkdirAll(notesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	base := markdown.NoteFileName(n)
+	ext := filepath.Ext(base)
+	stem := strings.TrimSuffix(base, ext)
+	for i := range maxNotePathAttempts {
+		name := base
+		if i > 0 {
+			name = fmt.Sprintf("%s-%d%s", stem, i+1, ext)
+		}
+		if err := os.WriteFile(filepath.Join(notesDir, name), []byte("taken"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.AddNote("Ada Cap", n); err == nil {
+		t.Fatal("expected unique path cap error")
 	}
 }
 

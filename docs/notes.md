@@ -4,8 +4,10 @@ A *note* is a timestamped event attached to a person. Notes capture what
 contacts can't: what you talked about, when, and where it happened.
 
 Notes live under `people/<slug>/notes/`. Each note is a single markdown file
-named `<occurred-at>-<source>.md`, e.g.
-`2026-05-08T09-15-00Z-whatsapp.md`.
+named `<occurred-at>-<kind>.md`, e.g.
+`2026-05-08T09-15-00Z-dm.md`. Notes with the same timestamp and kind get
+numeric suffixes (`-2.md`, `-3.md`, and so on), preserving existing files.
+If the notes path cannot be accessed, `note add` reports the filesystem error.
 
 **Notes are local-only.** They are never written to Apple Contacts, Google
 Contacts, or anywhere else. They are pushed only to your private backup

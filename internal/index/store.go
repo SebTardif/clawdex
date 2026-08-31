@@ -15,8 +15,6 @@ import (
 	"github.com/openclaw/clawdex/internal/repo"
 )
 
-const maxNotePathAttempts = 1000
-
 type Store struct {
 	Repo repo.Repo
 }
@@ -142,7 +140,7 @@ func (s Store) AddNote(personQuery string, note model.Note) (model.Note, error) 
 func uniqueNotePath(dir, fileName string) (string, error) {
 	ext := filepath.Ext(fileName)
 	stem := strings.TrimSuffix(fileName, ext)
-	for i := range maxNotePathAttempts {
+	for i := 0; ; i++ {
 		candidate := fileName
 		if i > 0 {
 			candidate = fmt.Sprintf("%s-%d%s", stem, i+1, ext)
@@ -156,7 +154,6 @@ func uniqueNotePath(dir, fileName string) (string, error) {
 			return "", err
 		}
 	}
-	return "", fmt.Errorf("could not allocate unique note path under %s after %d attempts", dir, maxNotePathAttempts)
 }
 
 func (s Store) Notes(personQuery string) ([]model.Note, error) {

@@ -288,15 +288,15 @@ func TestAddNoteUniqueSuffixUsesOriginalBase(t *testing.T) {
 	}
 }
 
-func TestAddNoteUniqueSuffixCap(t *testing.T) {
+func TestAddNoteUniqueSuffixBeyond1000(t *testing.T) {
 	r := testRepo(t)
 	s := New(r)
-	p, err := s.AddPerson("Ada Cap", nil, nil, nil, time.Now())
+	p, err := s.AddPerson("Ada Many Notes", nil, nil, nil, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 5, 8, 9, 0, 0, 0, time.UTC)
-	n := markdown.NewNote(p.ID, "note", "manual", "cap", now, now, nil)
+	n := markdown.NewNote(p.ID, "note", "manual", "after 1000", now, now, nil)
 	notesDir := filepath.Join(filepath.Dir(p.Path), "notes")
 	if err := os.MkdirAll(notesDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -304,7 +304,7 @@ func TestAddNoteUniqueSuffixCap(t *testing.T) {
 	base := markdown.NoteFileName(n)
 	ext := filepath.Ext(base)
 	stem := strings.TrimSuffix(base, ext)
-	for i := range maxNotePathAttempts {
+	for i := range 1000 {
 		name := base
 		if i > 0 {
 			name = fmt.Sprintf("%s-%d%s", stem, i+1, ext)
@@ -313,8 +313,33 @@ func TestAddNoteUniqueSuffixCap(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.AddNote("Ada Cap", n); err == nil {
-		t.Fatal("expected unique path cap error")
+	added, err := s.AddNote("Ada Many Notes", n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(added.Path) != "2026-05-08T09-00-00Z-note-1001.md" {
+		t.Fatalf("path = %s", added.Path)
+	}
+	entries, err := os.ReadDir(notesDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1001 {
+		t.Fatalf("note files = %d, want 1001", len(entries))
+	}
+	for _, entry := range entries {
+		path := filepath.Join(notesDir, entry.Name())
+		if path == added.Path {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil || string(data) != "taken" {
+			t.Fatalf("existing note %s changed: data=%q err=%v", path, data, err)
+		}
+	}
+	written, _, err := markdown.ReadNote(added.Path)
+	if err != nil || strings.TrimSpace(written.Body) != n.Body {
+		t.Fatalf("new note body = %q, err=%v", written.Body, err)
 	}
 }
 

@@ -2,6 +2,7 @@
 
 ## 0.1.1 - Unreleased
 
+- Fixed `note add` hanging on inaccessible notes paths and corrected duplicate filename suffixes without limiting note counts. Thanks @SebTardif.
 - Hardened avatar storage and vCard avatar reads against symlink escapes, and made avatar and vCard file replacement private and atomic.
 - Enforced the global `--dry-run` no-write contract across initialization, config, people, notes, imports, vCard export, Git helpers, doctor repairs, and automatic repair.
 - Updated to Go 1.26.6 and CrawlKit 0.13.4 to resolve Go standard-library vulnerabilities GO-2026-5856, GO-2026-5026, GO-2026-5972, GO-2026-6090, and GO-2026-6218.

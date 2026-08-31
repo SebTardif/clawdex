@@ -126,20 +126,34 @@ func (s Store) AddNote(personQuery string, note model.Note) (model.Note, error) 
 	}
 	note.PersonID = p.ID
 	dir := filepath.Join(filepath.Dir(p.Path), "notes")
-	path := filepath.Join(dir, markdown.NoteFileName(note))
-	for i := 2; ; i++ {
-		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-			break
-		}
-		ext := filepath.Ext(path)
-		base := strings.TrimSuffix(path, ext)
-		path = fmt.Sprintf("%s-%d%s", base, i, ext)
+	path, err := uniqueNotePath(dir, markdown.NoteFileName(note))
+	if err != nil {
+		return model.Note{}, err
 	}
 	note.Path = path
 	if err := markdown.WriteNote(path, note); err != nil {
 		return model.Note{}, err
 	}
 	return note, nil
+}
+
+func uniqueNotePath(dir, fileName string) (string, error) {
+	ext := filepath.Ext(fileName)
+	stem := strings.TrimSuffix(fileName, ext)
+	for i := 0; ; i++ {
+		candidate := fileName
+		if i > 0 {
+			candidate = fmt.Sprintf("%s-%d%s", stem, i+1, ext)
+		}
+		path := filepath.Join(dir, candidate)
+		_, err := os.Stat(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return path, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
 }
 
 func (s Store) Notes(personQuery string) ([]model.Note, error) {

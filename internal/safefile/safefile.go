@@ -11,6 +11,12 @@ import (
 	"strings"
 )
 
+// MaxReadBytes is the cap for user-selected ReadPath files (10 MiB).
+const MaxReadBytes int64 = 10 << 20
+
+// ErrTooLarge is returned when a capped read exceeds its byte limit.
+var ErrTooLarge = errors.New("file too large")
+
 // Relative returns target as a path beneath root. It rejects lexical escapes;
 // filesystem accessors below additionally reject symbolic-link components.
 func Relative(root, target string) (string, error) {
@@ -59,6 +65,19 @@ func ExistingPath(root, relative string) (string, error) {
 // component. The platform opener anchors the root and rejects links while the
 // path is resolved, so concurrent parent swaps cannot redirect the read.
 func ReadFile(root, relative string) ([]byte, error) {
+	return readFile(root, relative, 0)
+}
+
+// ReadFileMax is ReadFile with a positive byte ceiling. Oversized files are
+// rejected before the body is copied into memory.
+func ReadFileMax(root, relative string, maxBytes int64) ([]byte, error) {
+	if maxBytes <= 0 {
+		return nil, errors.New("max bytes must be positive")
+	}
+	return readFile(root, relative, maxBytes)
+}
+
+func readFile(root, relative string, maxBytes int64) ([]byte, error) {
 	clean, err := cleanRelative(relative)
 	if err != nil {
 		return nil, err
@@ -75,13 +94,31 @@ func ReadFile(root, relative string) ([]byte, error) {
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("path is not a regular file: %s", clean)
 	}
-	return io.ReadAll(f)
+	if maxBytes > 0 && info.Size() > maxBytes {
+		return nil, fmt.Errorf("%w: %d bytes (max %d)", ErrTooLarge, info.Size(), maxBytes)
+	}
+	if maxBytes <= 0 {
+		return io.ReadAll(f)
+	}
+	limit := maxBytes + 1
+	if limit <= 0 {
+		return io.ReadAll(f)
+	}
+	data, err := io.ReadAll(io.LimitReader(f, limit))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("%w: exceeds %d bytes", ErrTooLarge, maxBytes)
+	}
+	return data, nil
 }
 
 // ReadPath reads an ordinary user-selected file without following symbolic
 // links beneath a trusted process directory. The current directory, home, and
 // temporary directory are treated as anchors so stable platform aliases such
 // as macOS /var can be resolved once without permitting symlinks below them.
+// Reads stop at MaxReadBytes so a huge user path cannot OOM the process.
 func ReadPath(path string) ([]byte, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -91,7 +128,7 @@ func ReadPath(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ReadFile(root, relative)
+	return readFile(root, relative, MaxReadBytes)
 }
 
 func readPathRoot(abs string) (string, string, error) {

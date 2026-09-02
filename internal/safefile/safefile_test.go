@@ -37,6 +37,46 @@ func TestReadFileRejectsSymlinkLeafAndParent(t *testing.T) {
 	}
 }
 
+func TestReadPathRejectsOversize(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "huge.bin")
+	if err := os.WriteFile(path, make([]byte, MaxReadBytes+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	data, err := ReadPath(path)
+	if err == nil || !errors.Is(err, ErrTooLarge) || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("ReadPath oversize data=%d err=%v", len(data), err)
+	}
+
+	exact := filepath.Join(root, "exact.bin")
+	if err := os.WriteFile(exact, make([]byte, MaxReadBytes), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	data, err = ReadPath(exact)
+	if err != nil || int64(len(data)) != MaxReadBytes {
+		t.Fatalf("ReadPath exact data=%d err=%v", len(data), err)
+	}
+}
+
+func TestReadFileMaxRejectsOversize(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "file"), []byte("12345"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := ReadFile(root, "file"); err != nil || string(data) != "12345" {
+		t.Fatalf("uncapped ReadFile data=%q err=%v", data, err)
+	}
+	if _, err := ReadFileMax(root, "file", 4); err == nil || !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("ReadFileMax error = %v", err)
+	}
+	if data, err := ReadFileMax(root, "file", 5); err != nil || string(data) != "12345" {
+		t.Fatalf("exact max data=%q err=%v", data, err)
+	}
+	if _, err := ReadFileMax(root, "file", 0); err == nil {
+		t.Fatal("expected non-positive max error")
+	}
+}
+
 func TestReadPathRejectsSymlinkLeafAndParent(t *testing.T) {
 	root := t.TempDir()
 	realDir := filepath.Join(root, "real")

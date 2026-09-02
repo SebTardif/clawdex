@@ -38,7 +38,9 @@ same non-writing destination validation.
 Manual source files must be regular files reached without a symlink leaf or a
 symlink beneath the current directory, home directory, or temporary directory.
 This prevents an apparently local avatar from copying unrelated file contents
-into the contacts repo.
+into the contacts repo. Files larger than 10 MiB are rejected, matching the
+Google import avatar cap, so `clawdex person avatar set` cannot load a huge
+path into memory.
 
 Manual avatars are sticky: subsequent `clawdex import apple` and
 `clawdex import google` runs will **never overwrite a manual avatar**. To

@@ -27,6 +27,8 @@ const (
 	maxContactsListPages = 500
 )
 
+var avatarHTTPClient = &http.Client{Timeout: avatarLookupTimeout}
+
 type Options struct {
 	IncludeAvatars    bool
 	AvatarConcurrency int
@@ -318,7 +320,7 @@ func fetchAvatarURL(ctx context.Context, url string) (model.SourceAvatar, error)
 	if err != nil {
 		return model.SourceAvatar{}, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := avatarHTTPClient.Do(req)
 	if err != nil {
 		return model.SourceAvatar{}, err
 	}

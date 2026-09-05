@@ -3,6 +3,7 @@ package apple
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -69,7 +70,7 @@ func decodeWithLimit(r io.Reader, maxBytes int64) ([]Contact, error) {
 	if limited.N == 0 {
 		return nil, errExportTooLarge(maxBytes)
 	}
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return nil, nil
 	}
 	if err != nil {
@@ -88,9 +89,9 @@ func decodeWithLimit(r io.Reader, maxBytes int64) ([]Contact, error) {
 			return nil, errExportTooLarge(maxBytes)
 		}
 		if extraErr == nil {
-			return nil, fmt.Errorf("invalid data after JSON array")
+			return nil, errors.New("invalid data after JSON array")
 		}
-		if extraErr != io.EOF {
+		if !errors.Is(extraErr, io.EOF) {
 			return nil, extraErr
 		}
 		return contacts, nil
@@ -100,7 +101,7 @@ func decodeWithLimit(r io.Reader, maxBytes int64) ([]Contact, error) {
 	for {
 		var c Contact
 		if err := dec.Decode(&c); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, limitOr(err, limited, maxBytes)

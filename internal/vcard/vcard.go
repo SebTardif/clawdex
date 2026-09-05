@@ -185,8 +185,11 @@ func folded(w io.Writer, line string) error {
 	const limit = 75
 	for len(line) > limit {
 		cut := limit
-		for !utf8.ValidString(line[:cut]) {
+		for cut > 0 && !utf8.ValidString(line[:cut]) {
 			cut--
+		}
+		if cut == 0 {
+			cut = 1
 		}
 		if _, err := fmt.Fprint(w, line[:cut]+"\r\n "); err != nil {
 			return err

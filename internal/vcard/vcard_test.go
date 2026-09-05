@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	"github.com/openclaw/clawdex/internal/model"
 	"github.com/openclaw/clawdex/internal/safefile"
@@ -261,6 +263,75 @@ func TestVCardHelpers(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "\r\n ") {
 		t.Fatalf("not folded: %q", buf.String())
+	}
+}
+
+func TestFoldedInvalidUTF8DoesNotHang(t *testing.T) {
+	line := "\xff" + strings.Repeat("a", 80)
+	var buf bytes.Buffer
+	done := make(chan error, 1)
+	go func() {
+		done <- folded(&buf, line)
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("folded hung on a line that starts with invalid UTF-8")
+	}
+	out := buf.String()
+	if !strings.Contains(out, "\r\n ") {
+		t.Fatalf("not folded: %q", out)
+	}
+	unfolded := strings.ReplaceAll(strings.TrimSuffix(out, "\r\n"), "\r\n ", "")
+	if unfolded != line {
+		t.Fatalf("unfolded = %q want %q", unfolded, line)
+	}
+}
+
+func TestFoldedUTF8KeepsRuneBoundaries(t *testing.T) {
+	for _, line := range []string{strings.Repeat("é", 50), strings.Repeat("世", 40)} {
+		var buf bytes.Buffer
+		if err := folded(&buf, line); err != nil {
+			t.Fatal(err)
+		}
+		out := buf.String()
+		if !utf8.ValidString(out) {
+			t.Fatalf("folded split a rune: %q", out)
+		}
+		if !strings.Contains(out, "\r\n ") {
+			t.Fatalf("not folded: %q", out)
+		}
+		unfolded := strings.ReplaceAll(strings.TrimSuffix(out, "\r\n"), "\r\n ", "")
+		if unfolded != line {
+			t.Fatalf("unfolded = %q want %q", unfolded, line)
+		}
+	}
+}
+
+func TestWriteLongInvalidUTF8Name(t *testing.T) {
+	var buf bytes.Buffer
+	person := model.Person{
+		ID:   "person_1",
+		Name: "\xff" + strings.Repeat("a", 80),
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- Write(&buf, []model.Person{person})
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("Write hung on a long name that starts with invalid UTF-8")
+	}
+	unfolded := strings.ReplaceAll(buf.String(), "\r\n ", "")
+	if !strings.Contains(unfolded, "FN:\xff"+strings.Repeat("a", 80)) {
+		t.Fatalf("missing FN remainder: %q", buf.String())
 	}
 }
 

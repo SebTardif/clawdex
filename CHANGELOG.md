@@ -4,6 +4,7 @@
 
 - Fixed vCard export hanging on long salvaged names containing invalid UTF-8 bytes. Thanks @SebTardif.
 - Updated Kong to 1.16.1, CrawlKit to 0.14.7, x/sys to 0.47.0, and CI checks while preserving the Go 1.26.6 minimum.
+- Updated ordinary CI to Checkout 7.0.1, Setup Go 7.0.0, and Setup Node 7.0.0.
 - Fixed `note add` hanging on inaccessible notes paths and corrected duplicate filename suffixes without limiting note counts. Thanks @SebTardif.
 - Hardened avatar storage and vCard avatar reads against symlink escapes, and made avatar and vCard file replacement private and atomic.
 - Capped manual avatar reads at 10 MiB while preserving oversized legacy avatar metadata and import protection during Doctor repair. Thanks @SebTardif.

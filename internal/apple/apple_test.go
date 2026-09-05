@@ -3,11 +3,24 @@ package apple
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+type countingReader struct {
+	r io.Reader
+	n int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
 
 func TestDecodeJSONArrayAndNDJSON(t *testing.T) {
 	for _, input := range []string{
@@ -69,5 +82,36 @@ func TestDecodeLargeAvatarLine(t *testing.T) {
 	}
 	if len(contacts) != 1 || len(contacts[0].AvatarData) != 128*1024 {
 		t.Fatalf("contacts = %#v", contacts)
+	}
+}
+
+func TestDecodeLeadingWhitespaceAndTrailingArrayJunk(t *testing.T) {
+	contacts, err := Decode(strings.NewReader("  \n\t[{\"identifier\":\"a1\",\"full_name\":\"Ada Lovelace\"}]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(contacts) != 1 || contacts[0].Name() != "Ada Lovelace" {
+		t.Fatalf("contacts = %#v", contacts)
+	}
+	if _, err := Decode(strings.NewReader(`[{"identifier":"a1","full_name":"Ada"}] extra`)); err == nil {
+		t.Fatal("expected trailing data after JSON array to fail")
+	}
+}
+
+type errReader struct{ err error }
+
+func (e errReader) Read([]byte) (int, error) { return 0, e.err }
+
+func TestDecodeReaderErrors(t *testing.T) {
+	for _, prefix := range []string{"", " \n", "{}\n", "[", "[{", "[]", "[] \n"} {
+		boom := errors.New("boom")
+		if _, err := Decode(io.MultiReader(strings.NewReader(prefix), errReader{boom})); !errors.Is(err, boom) {
+			t.Fatalf("reader error after %q = %v", prefix, err)
+		}
+	}
+	for _, input := range []string{"[", "[{}", "[{},]", "[{", "[]{}", "[] extra"} {
+		if _, err := Decode(strings.NewReader(input)); err == nil {
+			t.Fatalf("expected invalid array error for %q", input)
+		}
 	}
 }

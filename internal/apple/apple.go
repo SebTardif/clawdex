@@ -2,10 +2,13 @@ package apple
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"strings"
+	"unicode"
 
 	"github.com/openclaw/clawdex/internal/model"
 )
@@ -55,36 +58,73 @@ func ReadFile(path string) ([]Contact, error) {
 }
 
 func Decode(r io.Reader) ([]Contact, error) {
-	raw, err := io.ReadAll(r)
+	br := bufio.NewReader(r)
+	first, err := peekNonSpace(br)
+	if errors.Is(err, io.EOF) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	trimmed := strings.TrimSpace(string(raw))
-	if trimmed == "" {
-		return nil, nil
+
+	if first == '[' {
+		return decodeArray(br)
 	}
-	if strings.HasPrefix(trimmed, "[") {
-		var contacts []Contact
-		if err := json.Unmarshal([]byte(trimmed), &contacts); err != nil {
-			return nil, err
-		}
-		return contacts, nil
-	}
+
 	var contacts []Contact
-	scanner := bufio.NewScanner(strings.NewReader(trimmed))
+	scanner := bufio.NewScanner(br)
 	scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
 			continue
 		}
 		var c Contact
-		if err := json.Unmarshal([]byte(line), &c); err != nil {
+		if err := json.Unmarshal(line, &c); err != nil {
 			return nil, err
 		}
 		contacts = append(contacts, c)
 	}
 	return contacts, scanner.Err()
+}
+
+func decodeArray(br *bufio.Reader) ([]Contact, error) {
+	dec := json.NewDecoder(br)
+	if _, err := dec.Token(); err != nil {
+		return nil, err
+	}
+	var contacts []Contact
+	for dec.More() {
+		var c Contact
+		if err := dec.Decode(&c); err != nil {
+			return nil, err
+		}
+		contacts = append(contacts, c)
+	}
+	if _, err := dec.Token(); err != nil {
+		return nil, err
+	}
+	// Include decoder read-ahead when checking for data after the closing bracket.
+	tail := bufio.NewReader(io.MultiReader(dec.Buffered(), br))
+	if _, err := peekNonSpace(tail); !errors.Is(err, io.EOF) {
+		if err != nil {
+			return nil, err
+		}
+		return nil, errors.New("invalid data after JSON array")
+	}
+	return contacts, nil
+}
+
+func peekNonSpace(br *bufio.Reader) (rune, error) {
+	for {
+		r, _, err := br.ReadRune()
+		if err != nil {
+			return 0, err
+		}
+		if !unicode.IsSpace(r) {
+			return r, br.UnreadRune()
+		}
+	}
 }
 
 func ToSourceContacts(contacts []Contact, includeAvatars bool) []model.SourceContact {

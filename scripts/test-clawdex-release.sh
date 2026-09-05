@@ -437,7 +437,7 @@ unset GH_TOKEN GITHUB_TOKEN
 
 write_finalized_changelog() {
   awk '
-    /^## 0\.1\.1 - Unreleased$/ { print "## 0.1.1 - 2026-07-09"; next }
+    /^## [0-9]+\.[0-9]+\.[0-9]+ - Unreleased$/ { print "## 0.1.1 - 2026-07-09"; next }
     { print }
   ' "$ROOT/CHANGELOG.md" > "$WORK_DIR/release-changelog.md"
 }
@@ -745,7 +745,7 @@ release_body=$(awk '
   /^## 0\.1\.1([[:space:]]|$)/ { in_release = 1; next }
   in_release && /^## / { exit }
   in_release && /^- / { print }
-' "$ROOT/CHANGELOG.md")
+' "$WORK_DIR/release-changelog.md")
 release_body+=$'\n\n'
 jq -n --arg body "$release_body" \
   '[{id: 42, tag_name: "v0.1.1", draft: true, prerelease: false, immutable: false, body: $body}]' \

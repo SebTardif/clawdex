@@ -437,11 +437,21 @@ unset GH_TOKEN GITHUB_TOKEN
 
 write_finalized_changelog() {
   awk '
-    /^## [0-9]+\.[0-9]+\.[0-9]+ - Unreleased$/ { print "## 0.1.1 - 2026-07-09"; next }
-    { print }
-  ' "$ROOT/CHANGELOG.md" > "$WORK_DIR/release-changelog.md"
+    BEGIN { print "# Changelog\n\n## 0.1.1 - 2026-07-09\n" }
+    /^## / { if (entries) exit; next }
+    /^- / { print; entries++ }
+    END { if (!entries) exit 1 }
+  ' "${1:-$ROOT/CHANGELOG.md}" > "$WORK_DIR/release-changelog.md"
 }
 write_finalized_changelog
+cp "$WORK_DIR/release-changelog.md" "$WORK_DIR/expected-changelog.md"
+for heading in '## Unreleased' '## 0.2.1 - Unreleased'; do
+  printf '# Changelog\n\n%s\n\n' "$heading" > "$WORK_DIR/next-changelog.md"
+  cat "$ROOT/CHANGELOG.md" >> "$WORK_DIR/next-changelog.md"
+  write_finalized_changelog "$WORK_DIR/next-changelog.md"
+  cmp "$WORK_DIR/expected-changelog.md" "$WORK_DIR/release-changelog.md" || \
+    fail "empty Unreleased section changed the synthetic release notes"
+done
 
 if CODESIGN_IDENTITY="$EXPECTED_AUTHORITY" \
   bash "$ROOT/scripts/materialize-clawdex-release-driver.sh" \
@@ -510,7 +520,8 @@ if CODESIGN_IDENTITY="$EXPECTED_AUTHORITY" \
   fail "release packaging accepted a writable driver volume"
 fi
 rm "$WORK_DIR/mock-writable-volume"
-cp "$ROOT/CHANGELOG.md" "$WORK_DIR/release-changelog.md"
+sed 's/^## 0\.1\.1 - 2026-07-09$/## 0.1.1 - Unreleased/' \
+  "$WORK_DIR/expected-changelog.md" > "$WORK_DIR/release-changelog.md"
 if CODESIGN_IDENTITY="$EXPECTED_AUTHORITY" NOTARYTOOL_PROFILE=test-profile \
   bash "$PACKAGER" v0.1.1 "$WORK_DIR/unreleased-changelog" >/dev/null 2>&1; then
   fail "release packaging accepted an unfinalized signed changelog"

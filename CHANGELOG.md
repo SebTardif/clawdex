@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 - Unreleased
+## 0.2.0 - 2026-09-05
 
 - **Highlights:** Import contacts from compatible local crawlers, with safer matching, local-only setup, and more reliable archive maintenance.
 - Added `import contacts --from` for compatible crawler exports, including Telecrawl and Wacrawl, with per-source evidence, normalized phone deduplication, idempotent imports, and safeguards against name-only and cross-person joins. Thanks @joshp123.

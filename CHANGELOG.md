@@ -8,6 +8,7 @@
 - Fixed `note add` hanging on inaccessible notes paths and corrected duplicate filename suffixes without limiting note counts. Thanks @SebTardif.
 - Hardened avatar storage and vCard avatar reads against symlink escapes, and made avatar and vCard file replacement private and atomic.
 - Capped manual avatar reads at 10 MiB while preserving oversized legacy avatar metadata and import protection during Doctor repair. Thanks @SebTardif.
+- Streamed Apple contact export decoding without a total size ceiling, preserving large file and macOS imports and the existing 16 MiB NDJSON record limit. Thanks @SebTardif.
 - Enforced the global `--dry-run` no-write contract across initialization, config, people, notes, imports, vCard export, Git helpers, doctor repairs, and automatic repair.
 - Updated to Go 1.26.6 and CrawlKit 0.13.4 to resolve Go standard-library vulnerabilities GO-2026-5856, GO-2026-5026, GO-2026-5972, GO-2026-6090, and GO-2026-6218.
 - Fixed Unicode-safe search snippets, live Discrawl WAL reads, unexpected person-directory errors, and tagged `go install` version reporting.

@@ -5,9 +5,24 @@ package apple
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestReadSystemPreservesLargeExport(t *testing.T) {
+	path := writeLargeContactExport(t, false)
+	orig := runSwiftContacts
+	t.Cleanup(func() { runSwiftContacts = orig })
+	runSwiftContacts = func(context.Context, string) ([]byte, error) {
+		return os.ReadFile(path)
+	}
+	contacts, err := ReadSystem(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkLargeContacts(t, contacts)
+}
 
 func TestReadSystemUsesSwiftRunner(t *testing.T) {
 	orig := runSwiftContacts

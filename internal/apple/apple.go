@@ -2,18 +2,16 @@ package apple
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
+	"unicode"
 
 	"github.com/openclaw/clawdex/internal/model"
 )
-
-// 64 MiB ceiling for import apple --input. Must exceed the old 16 MiB per-line max.
-const maxAppleExportBytes = 64 << 20
 
 type Contact struct {
 	Identifier string   `json:"identifier"`
@@ -60,16 +58,8 @@ func ReadFile(path string) ([]Contact, error) {
 }
 
 func Decode(r io.Reader) ([]Contact, error) {
-	return decodeWithLimit(r, maxAppleExportBytes)
-}
-
-func decodeWithLimit(r io.Reader, maxBytes int64) ([]Contact, error) {
-	limited := &io.LimitedReader{R: r, N: maxBytes + 1}
-	br := bufio.NewReader(limited)
+	br := bufio.NewReader(r)
 	first, err := peekNonSpace(br)
-	if limited.N == 0 {
-		return nil, errExportTooLarge(maxBytes)
-	}
 	if errors.Is(err, io.EOF) {
 		return nil, nil
 	}
@@ -77,72 +67,64 @@ func decodeWithLimit(r io.Reader, maxBytes int64) ([]Contact, error) {
 		return nil, err
 	}
 
-	dec := json.NewDecoder(br)
 	if first == '[' {
-		var contacts []Contact
-		if err := dec.Decode(&contacts); err != nil {
-			return nil, limitOr(err, limited, maxBytes)
-		}
-		var extra json.RawMessage
-		extraErr := dec.Decode(&extra)
-		if limited.N == 0 {
-			return nil, errExportTooLarge(maxBytes)
-		}
-		if extraErr == nil {
-			return nil, errors.New("invalid data after JSON array")
-		}
-		if !errors.Is(extraErr, io.EOF) {
-			return nil, extraErr
-		}
-		return contacts, nil
+		return decodeArray(br)
 	}
 
 	var contacts []Contact
-	for {
+	scanner := bufio.NewScanner(br)
+	scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
 		var c Contact
-		if err := dec.Decode(&c); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, limitOr(err, limited, maxBytes)
+		if err := json.Unmarshal(line, &c); err != nil {
+			return nil, err
 		}
 		contacts = append(contacts, c)
-		if limited.N == 0 {
-			return nil, errExportTooLarge(maxBytes)
-		}
 	}
-	if limited.N == 0 {
-		return nil, errExportTooLarge(maxBytes)
+	return contacts, scanner.Err()
+}
+
+func decodeArray(br *bufio.Reader) ([]Contact, error) {
+	dec := json.NewDecoder(br)
+	if _, err := dec.Token(); err != nil {
+		return nil, err
+	}
+	var contacts []Contact
+	for dec.More() {
+		var c Contact
+		if err := dec.Decode(&c); err != nil {
+			return nil, err
+		}
+		contacts = append(contacts, c)
+	}
+	if _, err := dec.Token(); err != nil {
+		return nil, err
+	}
+	// Include decoder read-ahead when checking for data after the closing bracket.
+	tail := bufio.NewReader(io.MultiReader(dec.Buffered(), br))
+	if _, err := peekNonSpace(tail); !errors.Is(err, io.EOF) {
+		if err != nil {
+			return nil, err
+		}
+		return nil, errors.New("invalid data after JSON array")
 	}
 	return contacts, nil
 }
 
-func peekNonSpace(br *bufio.Reader) (byte, error) {
+func peekNonSpace(br *bufio.Reader) (rune, error) {
 	for {
-		buf, err := br.Peek(1)
+		r, _, err := br.ReadRune()
 		if err != nil {
 			return 0, err
 		}
-		switch buf[0] {
-		case ' ', '\t', '\n', '\r':
-			if _, err := br.ReadByte(); err != nil {
-				return 0, err
-			}
-		default:
-			return buf[0], nil
+		if !unicode.IsSpace(r) {
+			return r, br.UnreadRune()
 		}
 	}
-}
-
-func errExportTooLarge(maxBytes int64) error {
-	return fmt.Errorf("apple export exceeds %d-byte limit", maxBytes)
-}
-
-func limitOr(err error, limited *io.LimitedReader, maxBytes int64) error {
-	if limited.N == 0 {
-		return errExportTooLarge(maxBytes)
-	}
-	return err
 }
 
 func ToSourceContacts(contacts []Contact, includeAvatars bool) []model.SourceContact {

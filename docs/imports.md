@@ -45,6 +45,10 @@ clawdex import apple --input ~/Desktop/contacts.json
 - `--input PATH` reads JSON or NDJSON instead — useful on Linux, in CI,
   when round-tripping a snapshot, or when deterministic permission behavior is
   required.
+- JSON arrays are decoded one contact at a time, and NDJSON is read one record
+  per line with the existing 16 MiB scanner limit. There is no total export-size
+  ceiling. Decoded contacts are retained until import; direct macOS imports also
+  buffer the Swift helper's output before decoding.
 - `--avatars` imports thumbnail bytes. Without it, only structured fields
   are imported.
 

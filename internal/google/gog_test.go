@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openclaw/clawdex/internal/model"
 )
@@ -347,5 +348,50 @@ func TestFetchAvatarURL(t *testing.T) {
 	}
 	if avatar, err := (GogAdapter{}).fetchAvatar(t.Context(), server.URL+"/avatar.png"); err != nil || string(avatar.Data) != "png" {
 		t.Fatalf("default fetchAvatar = %#v err=%v", avatar, err)
+	}
+}
+
+func TestFetchAvatarURLClientTimeout(t *testing.T) {
+	prev := avatarHTTPClient
+	avatarHTTPClient = &http.Client{Timeout: 50 * time.Millisecond}
+	t.Cleanup(func() { avatarHTTPClient = prev })
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("ResponseWriter does not support hijacking")
+			return
+		}
+		conn, _, err := hj.Hijack()
+		if err != nil {
+			t.Errorf("hijack: %v", err)
+			return
+		}
+		t.Cleanup(func() { _ = conn.Close() })
+	}))
+	t.Cleanup(server.Close)
+
+	start := time.Now()
+	done := make(chan error, 1)
+	go func() {
+		_, err := fetchAvatarURL(context.Background(), server.URL+"/stall")
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected timeout error from stalled avatar fetch")
+		}
+		if !strings.Contains(err.Error(), "Timeout") && !strings.Contains(err.Error(), "deadline") {
+			t.Fatalf("err = %v", err)
+		}
+		elapsed := time.Since(start)
+		if elapsed >= 2*time.Second {
+			t.Fatalf("stalled fetch returned after %v, want client timeout well under 2s: %v", elapsed, err)
+		}
+		t.Logf("stalled fetch returned in %v: %v", elapsed, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("fetchAvatarURL hung for 2s; client timeout did not fire")
 	}
 }

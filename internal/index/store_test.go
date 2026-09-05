@@ -1,6 +1,8 @@
 package index
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -16,6 +18,7 @@ import (
 	"github.com/openclaw/clawdex/internal/markdown"
 	"github.com/openclaw/clawdex/internal/model"
 	"github.com/openclaw/clawdex/internal/repo"
+	"github.com/openclaw/clawdex/internal/safefile"
 )
 
 func TestAddNoteAndSearch(t *testing.T) {
@@ -129,6 +132,54 @@ func TestAvatarSetAndImportBackfill(t *testing.T) {
 	}
 	if !changed || p.Avatar.Path != "" {
 		t.Fatalf("missing avatar was not cleared: changed=%v avatar=%#v", changed, p.Avatar)
+	}
+}
+
+func TestRepairAvatarMetadataPreservesOversizedManualAvatar(t *testing.T) {
+	r := testRepo(t)
+	s := New(r)
+	p, err := s.AddPerson("Legacy Avatar", []string{"legacy@example.com"}, nil, nil, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(t.TempDir(), "avatar.png")
+	writeTestPNG(t, src)
+	p, err = s.SetAvatar(p.ID, src, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(filepath.Dir(p.Path), p.Avatar.Path)
+	if err := os.Truncate(path, safefile.MaxReadBytes+1); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(p.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, changed, err := s.RepairAvatarMetadata(p, time.Now())
+	if !errors.Is(err, safefile.ErrTooLarge) || changed || got.Avatar != p.Avatar {
+		t.Fatalf("repair changed legacy avatar: changed=%v avatar=%#v err=%v", changed, got.Avatar, err)
+	}
+	after, err := os.ReadFile(p.Path)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("repair changed person metadata: %v", err)
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ImportContacts("apple", []model.SourceContact{{
+		ExternalID: "legacy-apple", Name: p.Name, Emails: p.Emails,
+		Avatar: &model.SourceAvatar{Data: data},
+	}}, false, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	got, err = s.FindPerson(p.ID)
+	if err != nil || got.Avatar != p.Avatar {
+		t.Fatalf("import replaced manual avatar: %#v err=%v", got.Avatar, err)
+	}
+	if info, err := os.Stat(path); err != nil || info.Size() != safefile.MaxReadBytes+1 {
+		t.Fatalf("legacy avatar bytes replaced: %v %v", info, err)
 	}
 }
 

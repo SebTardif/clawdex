@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/openclaw/clawdex/internal/model"
+	"github.com/openclaw/clawdex/internal/safefile"
 )
 
 func TestSetManualValidateAndRepair(t *testing.T) {
@@ -197,6 +198,24 @@ func TestImportedAvatarRejectsSymlinkEscapes(t *testing.T) {
 	}
 	if _, _, err := RepairMetadata(root, symlinkPerson, time.Now()); err == nil {
 		t.Fatal("expected symlink repair rejection")
+	}
+}
+
+func TestSetManualRejectsOversizeSource(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "huge.bin")
+	if err := os.WriteFile(src, make([]byte, safefile.MaxReadBytes+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	person := model.Person{ID: "person_1", Name: "Ada", Path: filepath.Join(dir, "people", "ada", "person.md")}
+	if _, err := SetManual(dir, person, src, time.Now()); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("SetManual oversize err = %v", err)
+	}
+	if _, err := ValidateManual(dir, person, src); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("ValidateManual oversize err = %v", err)
+	}
+	if _, err := InspectFile(src); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("InspectFile oversize err = %v", err)
 	}
 }
 

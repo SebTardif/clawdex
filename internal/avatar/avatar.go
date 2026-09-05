@@ -199,7 +199,7 @@ func RepairMetadata(root string, person model.Person, now time.Time) (model.Pers
 }
 
 func inspectRootedFile(root, relative string) (model.AvatarRef, error) {
-	data, err := safefile.ReadFile(root, relative)
+	data, err := safefile.ReadFileMax(root, relative, safefile.MaxReadBytes)
 	if err != nil {
 		return model.AvatarRef{}, err
 	}

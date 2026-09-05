@@ -22,7 +22,42 @@ import (
 
 	"github.com/openclaw/clawdex/internal/contactexport"
 	"github.com/openclaw/clawdex/internal/model"
+	"github.com/openclaw/clawdex/internal/safefile"
 )
+
+func TestDoctorPreservesOversizedManualAvatar(t *testing.T) {
+	cfg, data := testPaths(t)
+	src := filepath.Join(t.TempDir(), "avatar.png")
+	writeCLITestPNG(t, src)
+	for _, args := range [][]string{
+		{"init", data, "--remote", ""},
+		{"person", "add", "Legacy Avatar", "--email", "legacy@example.com"},
+		{"person", "avatar", "set", "legacy@example.com", src},
+	} {
+		if err := Execute(append([]string{"--config", cfg}, args...), &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	personPath := filepath.Join(data, "people", "legacy-avatar", "person.md")
+	avatarPath := filepath.Join(filepath.Dir(personPath), "avatars", "avatar.png")
+	if err := os.Truncate(avatarPath, safefile.MaxReadBytes+1); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshotTree(t, data)
+	for _, dryRun := range []bool{true, false} {
+		args := []string{"--config", cfg, "doctor", "--repair"}
+		if dryRun {
+			args = append(args, "--dry-run")
+		}
+		err := Execute(args, &bytes.Buffer{}, &bytes.Buffer{})
+		if dryRun && err != nil || !dryRun && !errors.Is(err, safefile.ErrTooLarge) {
+			t.Fatalf("dry-run=%v repair error=%v", dryRun, err)
+		}
+		if after := snapshotTree(t, data); !reflect.DeepEqual(before, after) {
+			t.Fatalf("doctor changed oversized avatar or metadata: before=%v after=%v", before, after)
+		}
+	}
+}
 
 func TestExecuteEndToEndLocalCommands(t *testing.T) {
 	cfg, data := testPaths(t)

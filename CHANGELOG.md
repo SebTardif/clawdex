@@ -2,6 +2,7 @@
 
 ## 0.1.1 - Unreleased
 
+- Capped manual avatar reads at 10 MiB while preserving oversized legacy avatar metadata and import protection during Doctor repair. Thanks @SebTardif.
 - Fixed `note add` hanging on inaccessible notes paths and corrected duplicate filename suffixes without limiting note counts. Thanks @SebTardif.
 - Hardened avatar storage and vCard avatar reads against symlink escapes, and made avatar and vCard file replacement private and atomic.
 - Enforced the global `--dry-run` no-write contract across initialization, config, people, notes, imports, vCard export, Git helpers, doctor repairs, and automatic repair.

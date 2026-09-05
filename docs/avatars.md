@@ -42,6 +42,11 @@ into the contacts repo. Files larger than 10 MiB are rejected, matching the
 Google import avatar cap, so `clawdex person avatar set` cannot load a huge
 path into memory.
 
+For existing stored avatars above this limit, `doctor --repair` reports the
+size error and leaves the avatar file and metadata untouched. The manual
+avatar remains protected from imports; resize it and set it again explicitly
+to bring it within the inspection limit.
+
 Manual avatars are sticky: subsequent `clawdex import apple` and
 `clawdex import google` runs will **never overwrite a manual avatar**. To
 let imports manage the avatar again, clear it first.

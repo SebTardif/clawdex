@@ -1,11 +1,13 @@
 package index
 
 import (
+	"errors"
 	"time"
 
 	"github.com/openclaw/clawdex/internal/avatar"
 	"github.com/openclaw/clawdex/internal/markdown"
 	"github.com/openclaw/clawdex/internal/model"
+	"github.com/openclaw/clawdex/internal/safefile"
 )
 
 func (s Store) SetAvatar(personQuery, imagePath string, now time.Time) (model.Person, error) {
@@ -39,6 +41,9 @@ func (s Store) ClearAvatar(personQuery string, now time.Time) (model.Person, err
 
 func (s Store) RepairAvatarMetadata(person model.Person, now time.Time) (model.Person, bool, error) {
 	p, changed, err := avatar.RepairMetadata(s.Repo.Path, person, now)
+	if errors.Is(err, safefile.ErrTooLarge) {
+		return person, false, err
+	}
 	if err != nil {
 		p = avatar.Clear(person)
 		p.UpdatedAt = now.UTC()

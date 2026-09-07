@@ -1,10 +1,6 @@
 # Changelog
 
-## Unreleased
-
-- Simplified signed releases through the shared OpenClaw Go CLI workflow, with automated notarization, artifact verification, and Homebrew updates.
-
-## 0.2.0 - 2026-09-05
+## 0.2.0 - 2026-09-06
 
 - **Highlights:** Import contacts from compatible local crawlers, with safer matching, local-only setup, and more reliable archive maintenance.
 - Added `import contacts --from` for compatible crawler exports, including Telecrawl and Wacrawl, with per-source evidence, normalized phone deduplication, idempotent imports, and safeguards against name-only and cross-person joins. Thanks @joshp123.
@@ -21,7 +17,7 @@
 - Hardened documentation rendering and third-party asset loading, and preserved metadata in the generated LLM documentation index. Thanks @vincentkoc.
 - Updated to Go 1.26.6 to resolve Go standard-library vulnerabilities GO-2026-5856, GO-2026-5026, GO-2026-5972, GO-2026-6090, and GO-2026-6218; refreshed Kong to 1.16.1, CrawlKit to 0.14.7, and x/sys to 0.47.0.
 - Updated CI checks and tooling, including Checkout 7.0.1, Setup Go 7.0.0, and Setup Node 7.0.0, while preserving the Go 1.26.6 minimum.
-- Replaced legacy CI publication with Foundation-signed and notarized Darwin artifacts, authenticated signed-tag builds, protected verification and publication, sealed asset snapshots, and downstream integrity checks; Homebrew updates remain a separate release step.
+- Simplified signed releases through the shared OpenClaw Go CLI workflow, with automated notarization, artifact verification, and Homebrew updates.
 
 ## 0.1.0 - 2026-05-08
 

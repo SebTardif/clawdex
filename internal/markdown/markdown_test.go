@@ -92,7 +92,7 @@ func TestBackupOriginalDoesNotCreateVolumeSegment(t *testing.T) {
 		if relErr != nil {
 			return relErr
 		}
-		for _, part := range strings.Split(rel, string(filepath.Separator)) {
+		for part := range strings.SplitSeq(rel, string(filepath.Separator)) {
 			if strings.HasSuffix(part, ":") {
 				t.Fatalf("backup path created volume segment %q: %q", part, walked)
 			}
@@ -127,7 +127,7 @@ func TestRepairBackupRelStripsVolumeName(t *testing.T) {
 	if filepath.IsAbs(rel) {
 		t.Fatalf("backup rel is still absolute: %q from %q", rel, path)
 	}
-	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+	for part := range strings.SplitSeq(rel, string(filepath.Separator)) {
 		if strings.HasSuffix(part, ":") {
 			t.Fatalf("volume-like segment %q in backup rel %q from %q", part, rel, path)
 		}

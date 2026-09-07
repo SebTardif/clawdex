@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.2.1 - 2026-09-06
 
 0.2.0 was tagged by a failed automated run but never published as a GitHub Release; its assets and release notes ship as 0.2.1.

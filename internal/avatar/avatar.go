@@ -130,6 +130,9 @@ func prepareImported(person model.Person, source model.SourceAvatar, sourceName 
 	if len(source.Data) == 0 {
 		return source, false, nil
 	}
+	if int64(len(source.Data)) > safefile.MaxReadBytes {
+		return model.SourceAvatar{}, false, fmt.Errorf("%w: %d bytes (max %d)", safefile.ErrTooLarge, len(source.Data), safefile.MaxReadBytes)
+	}
 	if source.SHA256 == "" || source.MIME == "" {
 		var err error
 		source, err = InspectBytes(source.Data)

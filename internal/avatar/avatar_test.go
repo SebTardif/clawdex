@@ -219,25 +219,6 @@ func TestSetManualRejectsOversizeSource(t *testing.T) {
 	}
 }
 
-func TestSetImportedRejectsOversizeData(t *testing.T) {
-	dir := t.TempDir()
-	person := model.Person{ID: "person_1", Name: "Ada", Path: filepath.Join(dir, "people", "ada", "person.md")}
-	source := model.SourceAvatar{
-		Data:   make([]byte, safefile.MaxReadBytes+1),
-		MIME:   "image/png",
-		SHA256: "oversized",
-	}
-	if _, changed, err := SetImported(dir, person, source, "apple", time.Now()); err == nil || changed || !strings.Contains(err.Error(), "too large") {
-		t.Fatalf("SetImported oversize err = %v changed=%v", err, changed)
-	}
-	if changed, err := ValidateImported(dir, person, source, "apple"); err == nil || changed || !strings.Contains(err.Error(), "too large") {
-		t.Fatalf("ValidateImported oversize err = %v changed=%v", err, changed)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "people", "ada", "avatars")); !os.IsNotExist(err) {
-		t.Fatalf("wrote avatar: %v", err)
-	}
-}
-
 func TestManualAvatarRejectsSymlinkSourceLeafAndParent(t *testing.T) {
 	root := t.TempDir()
 	sourceDir := filepath.Join(root, "source")

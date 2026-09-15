@@ -107,3 +107,94 @@ func TestNotesRejectSymlinkSourcesBeforeRepair(t *testing.T) {
 		})
 	}
 }
+
+func TestPeopleRejectPersonSymlinkBeforeRepair(t *testing.T) {
+	s := New(testRepo(t))
+	p, err := s.AddPerson("Ada", nil, nil, nil, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	private := filepath.Join(outside, "secret.txt")
+	original := "host-secret"
+	if err := os.WriteFile(private, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(p.Path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(private, p.Path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.People(); err == nil {
+		t.Fatal("symlink person.md was accepted")
+	}
+	data, err := os.ReadFile(private)
+	if err != nil || string(data) != original {
+		t.Fatalf("outside file changed: %q %v", data, err)
+	}
+	entries, err := os.ReadDir(s.Repo.RepairDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("outside contents copied to backups: %v", entries)
+	}
+}
+
+func TestRebuildRejectsIndexJSONSymlink(t *testing.T) {
+	s := New(testRepo(t))
+	if _, err := s.AddPerson("Ada", []string{"ada@example.com"}, nil, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	private := filepath.Join(outside, "secret.txt")
+	original := "host-index"
+	if err := os.WriteFile(private, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	indexPath := filepath.Join(s.Repo.IndexDir(), "emails.json")
+	if err := os.Remove(indexPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(private, indexPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Rebuild(); err == nil {
+		t.Fatal("symlink index json was accepted")
+	}
+	data, err := os.ReadFile(private)
+	if err != nil || string(data) != original {
+		t.Fatalf("outside file changed: %q %v", data, err)
+	}
+}
+
+func TestPeopleRejectRepairDirectorySymlink(t *testing.T) {
+	s := New(testRepo(t))
+	p, err := s.AddPerson("Ada", nil, nil, nil, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := "# Damaged Ada\n"
+	if err := os.WriteFile(p.Path, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	if err := os.Remove(s.Repo.RepairDir()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, s.Repo.RepairDir()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.People(); err == nil {
+		t.Fatal("symlink repair directory was accepted")
+	}
+	data, err := os.ReadFile(p.Path)
+	if err != nil || string(data) != original {
+		t.Fatalf("person changed after failed backup: %q %v", data, err)
+	}
+	entries, err := os.ReadDir(outside)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("backup escaped repository: %v %v", entries, err)
+	}
+}

@@ -54,7 +54,7 @@ func TestAppleAvatarLimit(t *testing.T) {
 				t.Fatalf("warning = %q", warning)
 			}
 			personPath := filepath.Join(data, "people", "ada", "person.md")
-			person, _, err := markdown.ReadPerson(personPath)
+			person, _, err := markdown.ReadPerson(data, personPath)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -84,7 +84,7 @@ func TestAppleAvatarLimitPreservesExistingAvatarAndContinues(t *testing.T) {
 				mustAppleCommand(t, cfg, "person", "avatar", "set", "ada", png)
 			}
 			path := filepath.Join(data, "people", "ada", "person.md")
-			before, _, err := markdown.ReadPerson(path)
+			before, _, err := markdown.ReadPerson(data, path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -100,14 +100,14 @@ func TestAppleAvatarLimitPreservesExistingAvatarAndContinues(t *testing.T) {
 				t.Fatal("dry-run changed existing data")
 			}
 			mustAppleCommand(t, cfg, args...)
-			after, _, err := markdown.ReadPerson(path)
+			after, _, err := markdown.ReadPerson(data, path)
 			if err != nil || before.Avatar != after.Avatar || len(after.Emails) != 1 || after.Emails[0].Value != "new@example.com" {
 				t.Fatalf("contact update or avatar preservation failed: %#v, %v", after, err)
 			}
 			if !reflect.DeepEqual(avatarBefore, snapshotTree(t, filepath.Join(filepath.Dir(path), "avatars"))) {
 				t.Fatal("existing avatar bytes changed")
 			}
-			grace, _, err := markdown.ReadPerson(filepath.Join(data, "people", "grace", "person.md"))
+			grace, _, err := markdown.ReadPerson(data, filepath.Join(data, "people", "grace", "person.md"))
 			if err != nil || grace.Avatar.Path == "" {
 				t.Fatalf("subsequent contact missing avatar: %#v, %v", grace, err)
 			}

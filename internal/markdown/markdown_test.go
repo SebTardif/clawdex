@@ -18,10 +18,10 @@ func TestPersonRoundTrip(t *testing.T) {
 	p.Tags = []string{"math"}
 	p.Sources = map[string]model.PersonSource{"telecrawl": {Names: []string{"Ada Lovelace"}, Phones: []string{"15550100"}}}
 	p.Body = "# Ada Lovelace\n\nNotes."
-	if err := WritePerson(path, p); err != nil {
+	if err := WritePerson(dir, path, p); err != nil {
 		t.Fatal(err)
 	}
-	got, report, err := ReadPerson(path)
+	got, report, err := ReadPerson(dir, path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,17 +46,17 @@ func TestPersonRepairSalvagesBrokenFrontmatter(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	p, report, err := ReadPerson(path)
+	p, report, err := ReadPerson(dir, path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !report.Needed || p.ID != "person_1" || p.Name != "Ada Lovelace" {
 		t.Fatalf("repair = %#v person = %#v", report, p)
 	}
-	if err := RepairPerson(path, filepath.Join(dir, ".clawdex", "repairs"), p, report, true); err != nil {
+	if err := RepairPerson(dir, path, filepath.Join(dir, ".clawdex", "repairs"), p, report, true); err != nil {
 		t.Fatal(err)
 	}
-	repaired, _, err := ReadPerson(path)
+	repaired, _, err := ReadPerson(dir, path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,12 +75,12 @@ func TestBackupOriginalDoesNotCreateVolumeSegment(t *testing.T) {
 	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	p, report, err := ReadPerson(path)
+	p, report, err := ReadPerson(dir, path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	repairRoot := filepath.Join(dir, ".clawdex", "repairs")
-	if err := RepairPerson(path, repairRoot, p, report, true); err != nil {
+	if err := RepairPerson(dir, path, repairRoot, p, report, true); err != nil {
 		t.Fatal(err)
 	}
 	var backups []string
@@ -143,7 +143,7 @@ func TestReadPersonMissingFrontmatterInfersNameFromHeading(t *testing.T) {
 	if err := os.WriteFile(path, []byte("# Ada Heading\n\nBody"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	p, report, err := ReadPerson(path)
+	p, report, err := ReadPerson(dir, path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestReadPersonMalformedDelimiterUsesSlug(t *testing.T) {
 	if err := os.WriteFile(path, []byte("---\nname: Ada\n# Missing close"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	p, report, err := ReadPerson(path)
+	p, report, err := ReadPerson(dir, path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +229,7 @@ func TestWritePersonOmitsEmptyStructsButKeepsNonEmpty(t *testing.T) {
 	p.Avatar.Path = "avatars/avatar.png"
 	p.Avatar.Source = "manual"
 	p.Google.Resource = "people/c1"
-	if err := WritePerson(path, p); err != nil {
+	if err := WritePerson(dir, path, p); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(path)
@@ -260,7 +260,7 @@ func TestMoreRepairAndNoteBranches(t *testing.T) {
 	if err := WriteNote(dir, path, n); err != nil {
 		t.Fatal(err)
 	}
-	if err := RepairPerson(path, filepath.Join(dir, "repairs"), modelPersonForTest(), RepairReport{}, true); err != nil {
+	if err := RepairPerson(dir, path, filepath.Join(dir, "repairs"), modelPersonForTest(), RepairReport{}, true); err != nil {
 		t.Fatal(err)
 	}
 	if nameFromBody("no heading") != "" {
@@ -270,7 +270,7 @@ func TestMoreRepairAndNoteBranches(t *testing.T) {
 	if err := os.WriteFile(parentFile, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := atomicWrite(filepath.Join(parentFile, "child"), []byte("x"), 0o600); err == nil {
+	if err := WritePerson(dir, filepath.Join(parentFile, "child"), modelPersonForTest()); err == nil {
 		t.Fatal("expected atomic write mkdir error")
 	}
 }

@@ -42,7 +42,7 @@ func (s Store) AddPerson(name string, emails, phones, tags []string, now time.Ti
 	path := filepath.Join(dir, "person.md")
 	p.Path = path
 	p.Body = "# " + p.Name + "\n"
-	if err := markdown.WritePerson(path, p); err != nil {
+	if err := markdown.WritePerson(s.Repo.Path, path, p); err != nil {
 		return model.Person{}, err
 	}
 	return p, s.Rebuild()
@@ -62,7 +62,7 @@ func (s Store) People() ([]model.Person, error) {
 			continue
 		}
 		path := filepath.Join(s.Repo.PeopleDir(), entry.Name(), "person.md")
-		p, report, err := markdown.ReadPerson(path)
+		p, report, err := markdown.ReadPerson(s.Repo.Path, path)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
@@ -70,7 +70,7 @@ func (s Store) People() ([]model.Person, error) {
 			return nil, err
 		}
 		if report.Needed && s.Repo.Config.Repair.AutoRepair {
-			if err := markdown.RepairPerson(path, s.Repo.RepairDir(), p, report, s.Repo.Config.Repair.BackupBeforeRepair); err != nil {
+			if err := markdown.RepairPerson(s.Repo.Path, path, s.Repo.RepairDir(), p, report, s.Repo.Config.Repair.BackupBeforeRepair); err != nil {
 				return nil, err
 			}
 		}
@@ -270,9 +270,6 @@ func (s Store) Rebuild() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(s.Repo.IndexDir(), 0o755); err != nil {
-		return err
-	}
 	emails := map[string]string{}
 	phones := map[string]string{}
 	handles := map[string]string{}
@@ -304,7 +301,7 @@ func (s Store) Rebuild() error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(s.Repo.IndexDir(), name), append(data, '\n'), 0o600); err != nil {
+		if err := safefile.AtomicWriteFile(s.Repo.Path, filepath.Join("index", name), append(data, '\n'), 0o600); err != nil {
 			return err
 		}
 	}

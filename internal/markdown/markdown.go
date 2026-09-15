@@ -55,8 +55,12 @@ func NewNote(personID, kind, source, body string, occurredAt, now time.Time, top
 	}
 }
 
-func ReadPerson(path string) (model.Person, RepairReport, error) {
-	data, err := os.ReadFile(path)
+func ReadPerson(root, path string) (model.Person, RepairReport, error) {
+	relative, err := safefile.Relative(root, path)
+	if err != nil {
+		return model.Person{}, RepairReport{}, err
+	}
+	data, err := safefile.ReadFile(root, relative)
 	if err != nil {
 		return model.Person{}, RepairReport{}, err
 	}
@@ -85,7 +89,11 @@ func ReadPerson(path string) (model.Person, RepairReport, error) {
 	return p, report, nil
 }
 
-func WritePerson(path string, p model.Person) error {
+func WritePerson(root, path string, p model.Person) error {
+	relative, err := safefile.Relative(root, path)
+	if err != nil {
+		return err
+	}
 	inferPerson(&p, path)
 	p.UpdatedAt = p.UpdatedAt.UTC()
 	front, err := yaml.Marshal(p)
@@ -96,20 +104,20 @@ func WritePerson(path string, p model.Person) error {
 	if body == "" {
 		body = "# " + p.Name + "\n"
 	}
-	return atomicWrite(path, appendFrontmatter(front, body), 0o600)
+	return safefile.AtomicWriteFile(root, relative, appendFrontmatter(front, body), 0o600)
 }
 
-func RepairPerson(path, repairRoot string, p model.Person, report RepairReport, backup bool) error {
+func RepairPerson(root, path, repairRoot string, p model.Person, report RepairReport, backup bool) error {
 	if !report.Needed {
 		return nil
 	}
 	if backup {
-		if err := backupOriginal(path, repairRoot); err != nil {
+		if err := backupOriginal(root, path, repairRoot); err != nil {
 			return err
 		}
 	}
 	p.Body = recoveredBody(p.Body, report.RecoveredMetadata)
-	return WritePerson(path, p)
+	return WritePerson(root, path, p)
 }
 
 func recoveredBody(body, metadata string) string {
@@ -128,24 +136,7 @@ func RepairNote(root, path, repairRoot string, n model.Note, report RepairReport
 		return nil
 	}
 	if backup {
-		relative, err := safefile.Relative(root, path)
-		if err != nil {
-			return err
-		}
-		original, err := safefile.ReadFile(root, relative)
-		if err != nil {
-			return err
-		}
-		repairRelative, err := safefile.Relative(root, repairRoot)
-		if err != nil {
-			return err
-		}
-		abs, err := filepath.Abs(path)
-		if err != nil {
-			return err
-		}
-		destination := filepath.Join(repairRelative, time.Now().UTC().Format("20060102T150405Z")+"-"+uuid.NewString(), repairBackupRel(abs))
-		if err := safefile.AtomicWriteFile(root, destination, original, 0o600); err != nil {
+		if err := backupOriginal(root, path, repairRoot); err != nil {
 			return err
 		}
 	}
@@ -294,32 +285,16 @@ func fileTime(path string) time.Time {
 	return info.ModTime().UTC()
 }
 
-func atomicWrite(path string, data []byte, perm os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+func backupOriginal(root, path, repairRoot string) error {
+	relative, err := safefile.Relative(root, path)
 	if err != nil {
 		return err
 	}
-	tmpPath := tmp.Name()
-	defer func() { _ = os.Remove(tmpPath) }()
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
+	original, err := safefile.ReadFile(root, relative)
+	if err != nil {
 		return err
 	}
-	if err := tmp.Chmod(perm); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpPath, path)
-}
-
-func backupOriginal(path, repairRoot string) error {
-	data, err := os.ReadFile(path)
+	repairRelative, err := safefile.Relative(root, repairRoot)
 	if err != nil {
 		return err
 	}
@@ -327,24 +302,9 @@ func backupOriginal(path, repairRoot string) error {
 	if err != nil {
 		return err
 	}
-	rel := repairBackupRel(abs)
-	if err := os.MkdirAll(repairRoot, 0o755); err != nil {
-		return err
-	}
-	// Each repair owns a directory so concurrent or same-second backups cannot overwrite one another.
-	dir, err := os.MkdirTemp(repairRoot, time.Now().UTC().Format("20060102T150405Z")+"-*")
-	if err != nil {
-		return err
-	}
-	dest := filepath.Join(dir, rel)
-	if !strings.HasPrefix(dest, filepath.Clean(dir)+string(filepath.Separator)) {
-		return fmt.Errorf("repair backup escaped repair root: %s", dest)
-	}
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return err
-	}
-	// #nosec G703 -- dest is constrained to the unique repair directory above.
-	return os.WriteFile(dest, data, 0o600)
+	// Each repair owns a directory so repeated backups retain every original.
+	destination := filepath.Join(repairRelative, time.Now().UTC().Format("20060102T150405Z")+"-"+uuid.NewString(), repairBackupRel(abs))
+	return safefile.AtomicWriteFile(root, destination, original, 0o600)
 }
 
 func repairBackupRel(path string) string {

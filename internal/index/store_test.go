@@ -112,7 +112,7 @@ func TestAvatarSetAndImportBackfill(t *testing.T) {
 		t.Fatalf("imported avatar = %#v", p.Avatar)
 	}
 	p.Avatar.SHA256 = "stale"
-	if err := markdown.WritePerson(p.Path, p); err != nil {
+	if err := markdown.WritePerson(s.Repo.Path, p.Path, p); err != nil {
 		t.Fatal(err)
 	}
 	p, changed, err := s.RepairAvatarMetadata(p, time.Now())
@@ -123,7 +123,7 @@ func TestAvatarSetAndImportBackfill(t *testing.T) {
 		t.Fatalf("metadata repair failed: changed=%v avatar=%#v", changed, p.Avatar)
 	}
 	p.Avatar.Path = "avatars/missing.png"
-	if err := markdown.WritePerson(p.Path, p); err != nil {
+	if err := markdown.WritePerson(s.Repo.Path, p.Path, p); err != nil {
 		t.Fatal(err)
 	}
 	p, changed, err = s.RepairAvatarMetadata(p, time.Now())
@@ -752,7 +752,7 @@ func TestSearchAccountsAndBadNoteError(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.Accounts = map[string][]string{"github": {"handle-person"}}
-	if err := markdown.WritePerson(p.Path, p); err != nil {
+	if err := markdown.WritePerson(s.Repo.Path, p.Path, p); err != nil {
 		t.Fatal(err)
 	}
 	hits, err := s.Search("handle-person")
@@ -798,7 +798,7 @@ func TestPeopleAutoRepairRebuildAccountsAndImportNoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.Accounts = map[string][]string{"github": {"ada"}}
-	if err := markdown.WritePerson(p.Path, p); err != nil {
+	if err := markdown.WritePerson(s.Repo.Path, p.Path, p); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Rebuild(); err != nil {

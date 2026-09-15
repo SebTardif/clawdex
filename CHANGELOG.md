@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rejected symbolic links in person Markdown, repair backups, and generated indexes, preventing outside-file reads and writes while preserving ordinary contact repositories. Thanks @SebTardif.
+
 ## 0.3.0 - 2026-09-13
 
 **Highlights:** Doctor now repairs damaged notes and keeps custom frontmatter intact; vCard exports and phone search are fixed.

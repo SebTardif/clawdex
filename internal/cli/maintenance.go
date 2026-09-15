@@ -175,14 +175,14 @@ func (c *DoctorCmd) Run(r *Runtime) error {
 		var avatarRepaired int
 		var notesRepaired int
 		for _, p := range people {
-			loaded, report, err := markdown.ReadPerson(p.Path)
+			loaded, report, err := markdown.ReadPerson(r.repo.Path, p.Path)
 			if err != nil {
 				return err
 			}
 			if report.Needed {
 				repaired++
 				if !r.root.DryRun {
-					if err := markdown.RepairPerson(p.Path, r.repo.RepairDir(), loaded, report, r.cfg.Repair.BackupBeforeRepair); err != nil {
+					if err := markdown.RepairPerson(r.repo.Path, p.Path, r.repo.RepairDir(), loaded, report, r.cfg.Repair.BackupBeforeRepair); err != nil {
 						return err
 					}
 				}

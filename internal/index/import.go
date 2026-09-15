@@ -61,7 +61,7 @@ func (s Store) importContacts(source string, contacts []model.SourceContact, opt
 					}
 					if withAvatar.Avatar.Path != "" {
 						withAvatar.UpdatedAt = now.UTC()
-						if err := markdown.WritePerson(withAvatar.Path, withAvatar); err != nil {
+						if err := markdown.WritePerson(s.Repo.Path, withAvatar.Path, withAvatar); err != nil {
 							return nil, err
 						}
 						created = withAvatar
@@ -127,7 +127,7 @@ func (s Store) importContacts(source string, contacts []model.SourceContact, opt
 		change := model.ImportChange{Action: "update", PersonID: p.ID, Name: p.Name, Source: matchedContact, Path: p.Path}
 		if !opts.DryRun {
 			p.UpdatedAt = now.UTC()
-			if err := markdown.WritePerson(p.Path, p); err != nil {
+			if err := markdown.WritePerson(s.Repo.Path, p.Path, p); err != nil {
 				return nil, err
 			}
 		}
@@ -436,7 +436,7 @@ func (s Store) createImportedPerson(p model.Person) (model.Person, error) {
 	}
 	p.Path = filepath.Join(dir, "person.md")
 	p.Body = "# " + p.Name + "\n"
-	if err := markdown.WritePerson(p.Path, p); err != nil {
+	if err := markdown.WritePerson(s.Repo.Path, p.Path, p); err != nil {
 		return model.Person{}, err
 	}
 	return p, nil

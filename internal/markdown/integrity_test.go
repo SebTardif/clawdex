@@ -24,11 +24,11 @@ func TestPreserveUnknownFrontmatter(t *testing.T) {
 			}
 			var encoded []byte
 			if kind == "person" {
-				p, _, err := ReadPerson(path)
+				p, _, err := ReadPerson(filepath.Dir(path), path)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := WritePerson(path, p); err != nil {
+				if err := WritePerson(filepath.Dir(path), path, p); err != nil {
 					t.Fatal(err)
 				}
 				encoded, err = json.Marshal(p)
@@ -80,17 +80,17 @@ func TestValidYAMLWithMissingIdentityNeedsRepair(t *testing.T) {
 	if err := os.WriteFile(path, []byte("---\nname: Ada\n---\n# Ada\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	p, report, err := ReadPerson(path)
+	p, report, err := ReadPerson(filepath.Dir(path), path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !report.Needed {
 		t.Fatal("missing identity and timestamps were not reported")
 	}
-	if err := RepairPerson(path, filepath.Join(t.TempDir(), "repairs"), p, report, true); err != nil {
+	if err := RepairPerson(filepath.Dir(path), path, filepath.Join(filepath.Dir(path), "repairs"), p, report, true); err != nil {
 		t.Fatal(err)
 	}
-	got, next, err := ReadPerson(path)
+	got, next, err := ReadPerson(filepath.Dir(path), path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,12 +102,12 @@ func TestValidYAMLWithMissingIdentityNeedsRepair(t *testing.T) {
 func TestRepairBackupsRetainEveryOriginalAtSameTime(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "person.md")
-		repairs := filepath.Join(t.TempDir(), "repairs")
+		repairs := filepath.Join(filepath.Dir(path), "repairs")
 		for _, original := range []string{"first original", "second original"} {
 			if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if err := backupOriginal(path, repairs); err != nil {
+			if err := backupOriginal(filepath.Dir(path), path, repairs); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -212,5 +212,54 @@ func TestFailedNoteBackupLeavesOriginalUntouched(t *testing.T) {
 	data, err := os.ReadFile(path)
 	if err != nil || string(data) != original {
 		t.Fatalf("original changed after failed backup: %q %v", data, err)
+	}
+}
+
+func TestPersonOperationsRejectPathsOutsideRoot(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "person.md")
+	original := "Synthetic outside person"
+	if err := os.WriteFile(outside, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := ReadPerson(root, outside); err == nil {
+		t.Error("read escaped root")
+	}
+	p := NewPerson("Replacement", time.Now())
+	if err := WritePerson(root, outside, p); err == nil {
+		t.Error("write escaped root")
+	}
+	for _, backup := range []bool{false, true} {
+		if err := RepairPerson(root, outside, filepath.Join(root, "repairs"), p, RepairReport{Needed: true}, backup); err == nil {
+			t.Errorf("repair escaped root, backup=%v", backup)
+		}
+	}
+	data, err := os.ReadFile(outside)
+	if err != nil || string(data) != original {
+		t.Fatalf("outside changed: %q %v", data, err)
+	}
+}
+
+func TestPersonOperationsRejectParentSymlink(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	path := filepath.Join(outside, "person.md")
+	original := "Synthetic outside person"
+	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "people")); err != nil {
+		t.Fatal(err)
+	}
+	linked := filepath.Join(root, "people", "person.md")
+	if _, _, err := ReadPerson(root, linked); err == nil {
+		t.Error("read followed parent symlink")
+	}
+	if err := WritePerson(root, linked, NewPerson("Replacement", time.Now())); err == nil {
+		t.Error("write followed parent symlink")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != original {
+		t.Fatalf("outside changed: %q %v", data, err)
 	}
 }

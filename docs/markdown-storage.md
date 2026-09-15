@@ -75,6 +75,19 @@ CLI JSON output.
 Markdown prose is retained; serialization normalizes CRLF line endings,
 removes leading blank lines, and adds a final newline.
 
+Person and note files, generated indexes, and repair backups must be ordinary
+files beneath the contacts repository. Clawdex rejects symbolic links in their
+paths and uses atomic replacement for writes. The repository root itself may
+use a platform alias, such as macOS `/var`.
+
+If an existing repository uses linked person files, replace each link with a
+regular file containing only the contact data you intend to archive. Inspect
+the link target before copying it. Remove linked index files; the next person
+creation or import regenerates them, and reads work without indexes. Replace
+linked storage or repair directories with real directories inside the repository.
+Remove the links themselves, leaving their targets intact. Then run
+`clawdex doctor --repair --dry-run` to check the contact files.
+
 ## Note files
 
 Notes are timestamped markdown files under `notes/`:

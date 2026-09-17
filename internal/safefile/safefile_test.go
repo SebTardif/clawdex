@@ -185,6 +185,14 @@ func TestAtomicWriteStreamsAndPreservesDestinationOnError(t *testing.T) {
 	}
 }
 
+func TestReadFileMissingIsNotExist(t *testing.T) {
+	root := t.TempDir()
+	_, err := ReadFile(root, "missing")
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing read error = %v", err)
+	}
+}
+
 func TestRootedMissingAndDestinationTypeErrors(t *testing.T) {
 	root := t.TempDir()
 	missingRoot := filepath.Join(root, "missing-root")
@@ -197,8 +205,8 @@ func TestRootedMissingAndDestinationTypeErrors(t *testing.T) {
 	if err := AtomicWriteFile(missingRoot, "file", nil, 0o600); err == nil {
 		t.Fatal("expected missing write root error")
 	}
-	if _, err := ReadFile(root, "missing"); err == nil {
-		t.Fatal("expected missing read error")
+	if _, err := ReadFile(root, "missing"); err == nil || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing read error = %v", err)
 	}
 	if _, err := ExistingPath(root, "missing"); err == nil {
 		t.Fatal("expected missing existing-path error")

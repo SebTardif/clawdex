@@ -221,7 +221,7 @@ func TestRootedMissingAndDestinationTypeErrors(t *testing.T) {
 	if err := os.Mkdir(directory, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ReadFile(root, "directory"); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+	if _, err := ReadFile(root, "directory"); err == nil || errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("directory read error = %v", err)
 	}
 	if err := AtomicWriteFile(root, "directory", nil, 0o600); err == nil || !strings.Contains(err.Error(), "not a regular file") {
